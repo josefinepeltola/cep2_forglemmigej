@@ -92,3 +92,4 @@ class Cep2Controller:
                     client.send_event(web_event.to_json())
                 except ConnectionError as ex:
                     print(f"{ex}")
+                    # testing
