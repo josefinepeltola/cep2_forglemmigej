@@ -53,6 +53,7 @@ class Cep2Zigbee2mqttMessage:
     meta: Any = None
     status: str = None
     state: str = None
+    color: dict = None # josefine added this
 
     @classmethod
     def parse(cls, topic: str, message: str) -> Cep2Zigbee2mqttMessage:
@@ -174,6 +175,19 @@ class Cep2Zigbee2mqttClient:
 
         self.__client.publish(topic=f"zigbee2mqtt/{device_id}/set",
                               payload=json.dumps({"state": f"{state}"}))
+        
+    # Josefine: added this    
+    def change_color(self, device_id: str, color: dict) -> None:
+        if not self.__connected:
+            raise RuntimeError("The client is not connected. Connect first.")
+        
+        # Serialize the payload to JSON
+        payload = json.dumps({"color": color})
+        
+        self.__client.publish(topic=f"zigbee2mqtt/{device_id}/set", payload=payload)
+        # self.__client.publish(topic=f"zigbee2mqtt/{device_id}/set",
+        #                       payload=json.dumps({"color": f"{color}"}))
+    ##
 
     def check_health(self) -> str:
         """ Allows to check whether zigbee2mqtt is healthy, i.e. the service is running properly.
