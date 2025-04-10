@@ -1,4 +1,4 @@
-#!/Users/josefinepeltola/Documents/GitHub/cep2_forglemmigej/mqtt_env/bin/python3.12
+#!/home/group3/Dokumenter/cep2_forglemmigej/mqtt_env/bin/python3
 # -*- coding: utf-8 -*-
 import re
 import sys
