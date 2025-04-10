@@ -2,6 +2,7 @@ from Cep2Model import Cep2Model
 from Cep2WebClient import Cep2WebClient, Cep2WebDeviceEvent
 from Cep2Zigbee2mqttClient import (Cep2Zigbee2mqttClient,
                                    Cep2Zigbee2mqttMessage, Cep2Zigbee2mqttMessageType)
+import time
 
 class Cep2Controller:
     HTTP_HOST = "http://localhost:8000"
@@ -70,22 +71,30 @@ class Cep2Controller:
 
         if device:
             try:
-                occupancy = message.event["occupancy"]
+                # occupancy = message.event["occupancy"]
+                strength = message.event["strength"]
             except KeyError:
                 pass
             else:
                 # Based on the value of occupancy, change the state of the actuators to ON
                 # (occupancy is true, i.e. a person is present in the room) or OFF.
-                new_state = "ON" if occupancy else "OFF"
+                # new_state = "ON" if occupancy else "OFF"
+                new_state = "ON" if strength else "OFF"
+                new_color = {"r":255,"g":0, "b":0} if strength else {"r":0,"g":255, "b":0}
+
+                # if new_state == "ON": 
+                #     time.sleep(2)
 
                 # Change the state on all actuators, i.e. LEDs and power plugs.
-                for a in self.__devices_model.actuators_list:
-                    self.__z2m_client.change_state(a.id_, new_state)
+                for b in self.__devices_model.actuators_list:
+                    self.__z2m_client.change_state(b.id_, new_state)
+                    self.__z2m_client.change_color(b.id_, new_color)
+                    
 
                 # Register event in the remote web server.
                 web_event = Cep2WebDeviceEvent(device_id=device.id_,
                                                device_type=device.type_,
-                                               measurement=occupancy)
+                                               measurement=strength) # measurement=occupancy
 
                 client = Cep2WebClient(self.HTTP_HOST)
                 try:
