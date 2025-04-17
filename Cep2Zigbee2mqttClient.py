@@ -10,6 +10,12 @@ from paho.mqtt.client import Client as MqttClient, MQTTMessage
 from paho.mqtt import publish, subscribe
 
 
+import paho.mqtt.client as mqtt
+import json
+from db import insert_motion_event
+# TOPIC = "zigbee2mqtt/0x54ef4410009495b7"
+MQTT_BROKER = "localhost"
+
 class Cep2Zigbee2mqttMessageType(Enum):
     """ Enumeration with the type of messages that zigbee2mqtt publishes.
     """
@@ -306,3 +312,67 @@ class Cep2Zigbee2mqttClient:
                 if message:
                     self.__on_message_clbk(Cep2Zigbee2mqttMessage.parse(message.topic,
                                                                         message.payload.decode("utf-8")))
+
+def on_connect(client, userdata, flags, rc):
+    client.subscribe("zigbee2mqtt/0x54ef4410009495b7")
+    client.subscribe("zigbee2mqtt/0x00158d000a983a3f")
+    
+
+def on_message(client, userdata, msg):
+    try:
+        payload = json.loads(msg.payload)
+        topic_tokens = msg.topic.split("/")  # Extract device ID from topic
+        if len(topic_tokens) > 1:
+            device_id = topic_tokens[1]
+            device = userdata.get("devices_model").find(device_id)  # Retrieve device from model
+
+            if device:
+                strength = payload.get("strength")
+                occupancy = payload.get("occupancy")
+
+                if strength is not None:
+                    insert_motion_event(strength, device)
+                elif occupancy is not None:
+                    insert_motion_event(occupancy, device)
+                else:
+                    print("MQTT message missing 'strength' or 'occupancy'")
+            else:
+                print(f"Unknown device ID: {device_id}")
+
+        else:
+            print("Invalid topic format")
+    except json.JSONDecodeError as e:
+        print(f"JSON decode error: {e}")
+
+# def on_message(client, userdata, msg):
+#     try:
+#         payload = json.loads(msg.payload)
+#         occupancy = payload.get("occupancy") 
+#         if occupancy is not None:
+#             insert_motion_event(occupancy)
+#         else:
+#             print("MQTT message missing 'occupancy'")
+#     except json.JSONDecodeError as e:
+#         print(f"JSON decode error: {e}")
+
+
+# def start_mqtt_loop():
+#     print("Initializing MQTT client...")
+#     client = mqtt.Client()
+#     client.on_connect = on_connect
+#     client.on_message = on_message
+
+#     client.connect(MQTT_BROKER)
+#     print("Start mqtt loop...")
+#     client.loop_forever()
+
+def start_mqtt_loop(devices_model):
+    print("Initializing MQTT client...")
+    client = mqtt.Client()
+    client.user_data_set({"devices_model": devices_model})  # Pass devices_model in userdata
+    client.on_connect = on_connect
+    client.on_message = on_message
+
+    client.connect(MQTT_BROKER)
+    print("Start mqtt loop...")
+    client.loop_forever()
