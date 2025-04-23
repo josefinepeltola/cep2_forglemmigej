@@ -12,7 +12,8 @@ from paho.mqtt import publish, subscribe
 
 import paho.mqtt.client as mqtt
 import json
-from db import insert_motion_event
+# from db import insert_motion_event
+from db import insert_event
 # TOPIC = "zigbee2mqtt/0x54ef4410009495b7"
 MQTT_BROKER = "localhost"
 
@@ -182,18 +183,28 @@ class Cep2Zigbee2mqttClient:
         self.__client.publish(topic=f"zigbee2mqtt/{device_id}/set",
                               payload=json.dumps({"state": f"{state}"}))
         
-    # Josefine: added this    
-    def change_color(self, device_id: str, color: dict) -> None:
+    
+    def change_color(self, device_id: str, color_payload: dict) -> None:
         if not self.__connected:
             raise RuntimeError("The client is not connected. Connect first.")
-        
+
         # Serialize the payload to JSON
-        payload = json.dumps({"color": color})
-        
+        payload = json.dumps(color_payload)
         self.__client.publish(topic=f"zigbee2mqtt/{device_id}/set", payload=payload)
-        # self.__client.publish(topic=f"zigbee2mqtt/{device_id}/set",
-        #                       payload=json.dumps({"color": f"{color}"}))
-    ##
+
+    # # Josefine: added this    
+    # def change_color(self, device_id: str, color: dict) -> None:
+    #     if not self.__connected:
+    #         raise RuntimeError("The client is not connected. Connect first.")
+        
+    #     # Serialize the payload to JSON
+    #     payload = json.dumps({"color": color})
+        
+    #     self.__client.publish(topic=f"zigbee2mqtt/{device_id}/set", payload=payload)
+    #     # self.__client.publish(topic=f"zigbee2mqtt/{device_id}/set",
+    #     #                       payload=json.dumps({"color": f"{color}"}))
+    # ##
+
 
     def check_health(self) -> str:
         """ Allows to check whether zigbee2mqtt is healthy, i.e. the service is running properly.
@@ -317,41 +328,42 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe("zigbee2mqtt/0x54ef4410009495b7")
     client.subscribe("zigbee2mqtt/0x00158d000a983a3f")
     
-
-def on_message(client, userdata, msg):
-    try:
-        payload = json.loads(msg.payload)
-        topic_tokens = msg.topic.split("/")  # Extract device ID from topic
-        if len(topic_tokens) > 1:
-            device_id = topic_tokens[1]
-            device = userdata.get("devices_model").find(device_id)  # Retrieve device from model
-
-            if device:
-                strength = payload.get("strength")
-                occupancy = payload.get("occupancy")
-
-                if strength is not None:
-                    insert_motion_event(strength, device)
-                elif occupancy is not None:
-                    insert_motion_event(occupancy, device)
-                else:
-                    print("MQTT message missing 'strength' or 'occupancy'")
-            else:
-                print(f"Unknown device ID: {device_id}")
-
-        else:
-            print("Invalid topic format")
-    except json.JSONDecodeError as e:
-        print(f"JSON decode error: {e}")
-
+    
+## I think unessecary ## 
+# recent_events = set()
 # def on_message(client, userdata, msg):
 #     try:
 #         payload = json.loads(msg.payload)
-#         occupancy = payload.get("occupancy") 
-#         if occupancy is not None:
-#             insert_motion_event(occupancy)
+#         topic_tokens = msg.topic.split("/")  # Extract device ID from topic
+#         if len(topic_tokens) > 1:
+#             device_id = topic_tokens[1]
+#             device = userdata.get("devices_model").find(device_id)  # Retrieve device from model
+
+#             if device:
+#                 strength = payload.get("strength")
+#                 occupancy = payload.get("occupancy")
+
+#                 # Delete duplicate events
+#                 event_id = f"{device_id}-{payload.get('timestamp', '')}"                # Create a unique identifier for the event (e.g., device_id + timestamp)           
+#                 if event_id in recent_events:                                           # Check if the event has already been processed
+#                     print(f"Duplicate event detected for {event_id}, skipping...")    # Debugging, see when dupes are detected
+#                     return
+#                 recent_events.add(event_id)                                             # Add the event to the cache
+#                 if len(recent_events) > 1000:                   # Limit the size of the cache to avoid memory issues
+#                     recent_events.pop()
+
+#                 # Insert events in DB
+#                 if strength is not None:
+#                     insert_motion_event(strength, device)
+#                 elif occupancy is not None:
+#                     insert_motion_event(occupancy, device)
+#                 else:
+#                     print("MQTT message missing 'strength' or 'occupancy'")
+#             else:
+#                 print(f"Unknown device ID: {device_id}")
+
 #         else:
-#             print("MQTT message missing 'occupancy'")
+#             print("Invalid topic format")
 #     except json.JSONDecodeError as e:
 #         print(f"JSON decode error: {e}")
 
@@ -371,7 +383,7 @@ def start_mqtt_loop(devices_model):
     client = mqtt.Client()
     client.user_data_set({"devices_model": devices_model})  # Pass devices_model in userdata
     client.on_connect = on_connect
-    client.on_message = on_message
+    # client.on_message = on_message
 
     client.connect(MQTT_BROKER)
     print("Start mqtt loop...")

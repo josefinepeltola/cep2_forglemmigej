@@ -2,8 +2,8 @@ import time
 from time import sleep
 from Controller import Cep2Controller
 from Model import Cep2Model, Cep2ZigbeeDevice
-
 from Cep2Zigbee2mqttClient import start_mqtt_loop
+from db import fetch_data
 
 if __name__ == "__main__":
     # Create a data model and add a list of known Zigbee devices.
