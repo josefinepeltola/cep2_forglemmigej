@@ -2,6 +2,11 @@ import mysql.connector
 from mysql.connector import Error
 import Controller
 from datetime import timedelta
+import requests
+import json
+
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def create_db_connection():
     try:
@@ -90,27 +95,100 @@ def fetch_and_print_tables():
         print("Could not connect to MySQL server.")
 
 
-def fetch_data():
-    connection = create_db_connection()
 
-    if connection:
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute("SELECT medication, intake_time, time_window FROM medicine ORDER BY intake_time ASC")
-        medicine = cursor.fetchall()
-        for r in medicine:
-            r['intake_time'] = format_timedelta(r['intake_time'])   # Format time 
-            r['time_window'] = format_timedelta(r['time_window'])   # Format time 
-            # print("Current medications:")
-            # print(r)    # print all data in tables for debugging                              
-        connection.close()      # Safeley close connection to DB
-        return medicine
-    else:
-        print("Could not connect to MySQL server.")
-        return None
+
+# def fetch_medication():
+#     connection = create_db_connection()
+
+#     if connection:
+#         cursor = connection.cursor(dictionary=True)
+#         cursor.execute(
+#             "SELECT medikament_navn, time_interval, dosis, enhed, tidspunkter_tages, prioritet " \
+#             "FROM medikament_liste " \
+#             "ORDER BY tidspunkter_tages ASC")
+#         medicine = cursor.fetchall()
+#         for r in medicine:
+#             r['intake_time'] = str(r['intake_time'])  # already string, but keep for clarity
+#             r['time_window'] = format_timedelta(timedelta(minutes=r['time_interval']))
+#             # r['intake_time'] = format_timedelta(r['intake_time'])   # Format time 
+#             # r['time_window'] = format_timedelta(r['time_window'])   # Format time 
+
+#             # print("Current medications:")
+#             # print(r)    # print all data in tables for debugging                              
+#         connection.close()      # Safeley close connection to DB
+#         return medicine
+#     else:
+#         print("Could not connect to MySQL server.")
+#         return None
+
+
+
+# def fetch_medication():
+#     try:
+#             response = requests.get(
+#                 "https://172.20.10.2:8000/api/getUserMedikamentListe/1",
+#                 verify=False  # ← disables certificate verification
+#             )
+
+#             if response.status_code == 200:
+#                 raw = response.json()
+#                 return [
+#                     {
+#                         'medikament_navn': med['name'],
+#                         'tidspunkter_tages': med['timesToTake'],
+#                         'time_interval': f"{int(med['timeInterval'])//60:02}:{int(med['timeInterval'])%60:02}:00",
+#                         'dosis': med['dose'],
+#                         'enhed': med['unit'],
+#                         'prioritet': med['priority'],
+#                     }
+#                     for med in raw['list']
+#                 ]
+#             else:
+#                 print(f"API error: {response.status_code}")
+#                 return []
+
+#     except Exception as e:
+#         print(f"Failed to fetch data: {e}")
+#         return []
+def fetch_medication():
+    try:
+        response = requests.get(
+            "https://172.20.10.2:8000/api/getUserMedikamentListe/1",
+            verify=False
+        )
+
+        if response.status_code != 200:
+            print(f"API error: {response.status_code}")
+            return []
+
+        raw = response.json()
+        flat_list = []
+
+        for med in raw['list']:
+            times = med['timesToTake']
+            if isinstance(times, str):
+                times = [times]  # wrap single string in a list
+            for time in times:
+                flat_list.append({
+                    'medikament_navn': med['name'],
+                    'tidspunkter_tages': med['timesToTake'],
+                    'time_interval': f"{int(med['timeInterval'])//60:02}:{int(med['timeInterval'])%60:02}:00",
+                    'dosis': med['dose'],
+                    'enhed': med['unit'],
+                    'prioritet': med['priority'],
+                })
+
+        return flat_list
+    
+
+    except Exception as e:
+        print(f"Failed to fetch data: {e}")
+        return []
+
 
 
 # if __name__ == "__main__":
 #     # create_db_connection()
 #     # fetch_and_print_tables()
-#     fetch_data()
+#     fetch_medication()
     

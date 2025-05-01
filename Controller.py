@@ -2,12 +2,14 @@ from Model import Cep2Model
 from Cep2WebClient import Cep2WebClient, Cep2WebDeviceEvent
 from Cep2Zigbee2mqttClient import (Cep2Zigbee2mqttClient,
                                    Cep2Zigbee2mqttMessage, Cep2Zigbee2mqttMessageType, start_mqtt_loop)
-from db import fetch_data, insert_event
+from db import fetch_medication, insert_event
 import time
+import json
 from datetime import datetime, timedelta
 
 class Cep2Controller:
-    HTTP_HOST = "http://localhost:8080"  # 8080 is same adress as zigbee gui. Got errors on 8000 and 8090
+    HTTP_HOST = "https://172.20.10.2:8000/api/getUserMedikamentListe/1"  # 8080 is same adress as zigbee gui. Got errors on 8000 and 8090
+    # HTTP_HOST = "https://127.0.0.1:8000"  # Updated to use HTTPS and port 8000
     MQTT_BROKER_HOST = "localhost"
     MQTT_BROKER_PORT = 1883
 
@@ -31,11 +33,14 @@ class Cep2Controller:
         self.__vibration_detected = False 
         self.__current_medication_index = 0             # Track the current medication being processed
 
-        self.__medicine_data = fetch_data()             # Fetch data once during initialization
+        self.__medicine_data = fetch_medication()             # Fetch data once during initialization
         if self.__medicine_data:
-            for r in self.__medicine_data:              # Print medications once during initialization
-                print("Current medications:")
-                print(r)  
+            printed = set()
+            print("Current medications:")
+            for r in self.__medicine_data:
+                if r['medikament_navn'] not in printed:
+                    print(r)
+                    printed.add(r['medikament_navn'])
             print("\n")
 
 
@@ -94,14 +99,14 @@ class Cep2Controller:
         Main logic for light control
 
         """
-        # Real current time
-        current_time = datetime.now()                           
-        formatted_time = current_time.strftime("%H:%M:%S")
+        # # Real current time
+        # current_time = datetime.now()                           
+        # formatted_time = current_time.strftime("%H:%M:%S")
 
-        # # Set your own time for testing 
-        # custom_time_str = "11:08:00"  # Replace with your desired time
-        # custom_time = datetime.strptime(custom_time_str, "%H:%M:%S")
-        # formatted_time = custom_time.strftime("%H:%M:%S") 
+        # Set your own time for testing 
+        custom_time_str = "13:08:00"  # Replace with your desired time
+        custom_time = datetime.strptime(custom_time_str, "%H:%M:%S")
+        formatted_time = custom_time.strftime("%H:%M:%S") 
 
 
         if device:
@@ -121,30 +126,52 @@ class Cep2Controller:
             if signal is not None and self.__current_medication_index < len(self.__medicine_data):          
                 current_medication = self.__medicine_data[self.__current_medication_index]                  # Initialize index for current medicine    
                 print("\n**** Current time:", formatted_time, " ****", 
-                      "\nNext medication:\t", current_medication['medication'], 
-                      "\nIntake time:\t\t", current_medication['intake_time'],
-                      "\nTime window:\t\t", current_medication['time_window'],
+                      "\nNext medication:\t", current_medication['medikament_navn'], 
+                      "\nIntake time:\t\t", current_medication['tidspunkter_tages'],
+                      "\nTime window:\t\t", current_medication['time_interval'],
                       )
                 
                 # Convert intake_time and time_window back to datetime and timedelta
-                intake_time = datetime.strptime(current_medication['intake_time'], "%H:%M:%S")
-                time_window_parts = current_medication['time_window'].split(":")
-                time_window = timedelta(hours=int(time_window_parts[0]),
-                                        minutes=int(time_window_parts[1]),
-                                        seconds=int(time_window_parts[2]))
+                # intake_time = datetime.strptime(current_medication['tidspunkter_tages'], "%H:%M:%S")
+                # intake_time = current_medication['tidspunkter_tages']
+                # time_window_parts = current_medication['time_interval'].split(":")
+                # time_window = timedelta(hours=int(time_window_parts[0]),
+                #                         minutes=int(time_window_parts[1]),
+                #                         seconds=int(time_window_parts[2]))
+                # time_sum = (intake_time + time_window).time()
+                
+                
+                # Get the time as a string
+                intake_time_str = current_medication['tidspunkter_tages']
+                # Ensure it's a string (optional safety)
+                if isinstance(intake_time_str, list):
+                    intake_time_str = intake_time_str[0]
+                intake_time = datetime.strptime(intake_time_str, "%H:%M")
+
+                # Parse the time interval string (e.g., "01:00:00")
+                time_window_parts = current_medication['time_interval'].split(":")
+                time_window = timedelta(
+                    hours=int(time_window_parts[0]),
+                    minutes=int(time_window_parts[1]),
+                    seconds=int(time_window_parts[2])
+                )
+
+
+                # Calculate intake time + window
                 time_sum = (intake_time + time_window).time()
                 
                 # Motion detected with pir sensor
                 # Motion must be true and nonzero 
                 if device.type_ == "pir" and signal != "false" and signal != 0: 
                     self.__vibration_detected = False                                                       # Set vibration to false 
-                    if formatted_time >= current_medication['intake_time'] :                                # If current time surpasses intake time glow orange 
-                        print("\nTime to take", current_medication['medication'], "!")
+                    if formatted_time >= intake_time_str:
+                    # if formatted_time >= current_medication['tidspunkter_tages'] :                                # If current time surpasses intake time glow orange 
+                        print("\nTime to take", current_medication['medikament_navn'], "!")
                         for b in self.__devices_model.actuators_list:                                   
                             self.__z2m_client.change_color(b.id_, {"color": {"x": 0.55, "y": 0.45}})           
-                        if formatted_time >= time_sum.strftime("%H:%M:%S"):                                 # If current time surpasses intake time + time window glow red
+                        if formatted_time >= time_sum.strftime("%H:%M"):                                 # If current time surpasses intake time + time window glow red
                             print("\n**** URGENT ****",
-                                  "\nTime window of ", current_medication['medication'], "has passed",
+                                  "\nTime window of ", current_medication['medikament_navn'], "has passed",
                                   "\n**** MUST TAKE ACTION NOW ****")
                             for b in self.__devices_model.actuators_list:                                   
                                 self.__z2m_client.change_color(b.id_, {"color": {"x": 0.72, "y": 0.25}})    
@@ -152,12 +179,36 @@ class Cep2Controller:
                 # Vibration detected 
                 elif device.type_ == "vibration" and self.__vibration_detected == False:
                     self.__vibration_detected = True                                                        # Set vibration detected to true
-                    if (current_medication['intake_time'] <= formatted_time):                               # If vibration is detected after intake time glow green
-                        print("\n", current_medication['medication'], "has been taken")
-                        insert_event(current_medication['medication'],                                      # Insert into DB
-                                     current_medication['intake_time'], 
-                                     current_medication['time_window'], 
-                                     formatted_time)   
+                    if formatted_time >= intake_time_str:
+                    # if (current_medication['tidspunkter_tages'] <= formatted_time):                               # If vibration is detected after intake time glow green
+
+                        print("\n", current_medication['medikament_navn'], "has been taken")
+                        
+                        # insert_event(current_medication['medication'],                                      # Insert into DB
+                        #              current_medication['intake_time'], 
+                        #              current_medication['time_window'], 
+                        #              formatted_time)  
+
+                                        # Prepare the event data to send to the web client
+                        
+                        event_data = {
+                            "name": current_medication['medikament_navn'],
+                            "timesToTake": current_medication['tidspunkter_tages'],
+                            "timeInterval": current_medication['time_interval'],
+                            "actual_time": formatted_time
+                        }
+
+                        # Use the Cep2WebClient to send the event
+                        client = Cep2WebClient(self.HTTP_HOST)
+                        try:
+                            client.send_event(json.dumps(event_data))  # Serialize the event data to JSON
+                            print("Event successfully sent to the web client API.")
+                        except ConnectionError as ex:
+                            print(f"Failed to send event to the web client API: {ex}")
+
+                        
+
+
                         for b in self.__devices_model.actuators_list:
                             self.__z2m_client.change_color(b.id_, {"color": {"x": 0.15, "y": 0.75}})
                         time.sleep(30)                                                                       # Decide how long to glow green after intake
@@ -166,17 +217,17 @@ class Cep2Controller:
                             self.__z2m_client.change_color(b.id_, {"color": {"x": 0.33, "y": 0.33}})
                     
 
-                # Register event in the remote web server.
-                web_event = Cep2WebDeviceEvent(device_id=device.id_,
-                                               device_type=device.type_,
-                                               measurement=signal) # measurement=occupancy
+                # # Register event in the remote web server.
+                # web_event = Cep2WebDeviceEvent(device_id=device.id_,
+                #                                device_type=device.type_,
+                #                                measurement=signal) # measurement=occupancy
 
 
-                client = Cep2WebClient(self.HTTP_HOST)
-                try:
-                    client.send_event(web_event.to_json())
-                except ConnectionError as ex:
-                    print(f"{ex}")
+                # client = Cep2WebClient(self.HTTP_HOST)
+                # try:
+                #     client.send_event(web_event.to_json())
+                # except ConnectionError as ex:
+                #     print(f"{ex}")
                     
 
 
