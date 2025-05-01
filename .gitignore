@@ -1,0 +1,6 @@
+*.pyc
+__pycache__/
+mqtt_env/
+.env
+*.sqlite3
+.DS_Store
