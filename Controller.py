@@ -94,14 +94,14 @@ class Cep2Controller:
         Main logic for light control
 
         """
-        # # Real current time
-        # current_time = datetime.now()                           
-        # formatted_time = current_time.strftime("%H:%M:%S")
+        # Real current time
+        current_time = datetime.now()                           
+        formatted_time = current_time.strftime("%H:%M:%S")
 
-        # Set your own time for testing 
-        custom_time_str = "23:30:00"  # Replace with your desired time
-        custom_time = datetime.strptime(custom_time_str, "%H:%M:%S")
-        formatted_time = custom_time.strftime("%H:%M:%S") 
+        # # Set your own time for testing 
+        # custom_time_str = "11:08:00"  # Replace with your desired time
+        # custom_time = datetime.strptime(custom_time_str, "%H:%M:%S")
+        # formatted_time = custom_time.strftime("%H:%M:%S") 
 
 
         if device:
@@ -160,12 +160,23 @@ class Cep2Controller:
                                      formatted_time)   
                         for b in self.__devices_model.actuators_list:
                             self.__z2m_client.change_color(b.id_, {"color": {"x": 0.15, "y": 0.75}})
-                        time.sleep(5)                                                                       # Decide how long to glow green after intake
+                        time.sleep(30)                                                                       # Decide how long to glow green after intake
                         self.__current_medication_index += 1                                                # Increment index
                         for b in self.__devices_model.actuators_list:                                       # Glow white after set time
                             self.__z2m_client.change_color(b.id_, {"color": {"x": 0.33, "y": 0.33}})
                     
-                
+
+                # Register event in the remote web server.
+                web_event = Cep2WebDeviceEvent(device_id=device.id_,
+                                               device_type=device.type_,
+                                               measurement=signal) # measurement=occupancy
+
+
+                client = Cep2WebClient(self.HTTP_HOST)
+                try:
+                    client.send_event(web_event.to_json())
+                except ConnectionError as ex:
+                    print(f"{ex}")
                     
 
 
@@ -216,13 +227,4 @@ class Cep2Controller:
             #             self.__z2m_client.change_color(b.id_, make_green)
                                 
 
-            #     # Register event in the remote web server.
-            #     web_event = Cep2WebDeviceEvent(device_id=device.id_,
-            #                                    device_type=device.type_,
-            #                                    measurement=signal) # measurement=occupancy
-
-            #     client = Cep2WebClient(self.HTTP_HOST)
-            #     try:
-            #         client.send_event(web_event.to_json())
-            #     except ConnectionError as ex:
-            #         print(f"{ex}")
+                
