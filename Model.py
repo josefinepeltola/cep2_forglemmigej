@@ -34,14 +34,17 @@ class Cep2Model:
         return list(filter(lambda s: s.type_ in {"led", "power plug"},
                            self.__devices.values()))
 
+
     @property
     def devices_list(self) -> List[Cep2ZigbeeDevice]:
         return list(self.__devices.values())
+
 
     @property
     def sensors_list(self) -> List[Cep2ZigbeeDevice]:
         return list(filter(lambda s: s.type_ in {"pir"},
                            self.__devices.values()))
+
 
     def add(self, device: Union[Cep2ZigbeeDevice, List[Cep2ZigbeeDevice]]) -> None:
         """ Add a new devices to the database.
@@ -58,6 +61,7 @@ class Cep2Model:
         # Insert list of devices, where the device ID is the key of the dictionary.
         for s in list_devices:
             self.__devices[s.id_] = s
+
 
     def find(self, device_id: str) -> Optional[Cep2ZigbeeDevice]:
         """ Retrieve a device from the database by its ID.
