@@ -5,7 +5,6 @@ from Cep2Zigbee2mqttClient import (
     Cep2Zigbee2mqttMessage,
     Cep2Zigbee2mqttMessageType,
 )
-# from db import fetch_medication
 import time
 import json
 import base64
@@ -18,8 +17,12 @@ case, the class listens for zigbee2mqtt events, processes them (turn on another 
 and send an event to a remote HTTP server.
 """
 class Cep2Controller:
-    HTTP_GET_HOST = "https://172.20.10.2:8000/api/getUserMedikamentListe/1"
-    HTTP_POST_HOST = "https://172.20.10.2:8000/api/MedicationRegistrationLog/1"
+    # HTTP_GET_HOST = "https://172.20.10.2:8000/api/getUserMedikamentListe/1"
+    # HTTP_POST_HOST = "https://172.20.10.2:8000/api/MedicationRegistrationLog/1"
+    # HTTP_POST_HOST_UDSTYR = "https://172.20.10.2:8000/api/sendUdstyrListeInfo/1"
+    # HTTP_POST_HOST_USER = "https://172.20.10.2:8000/api/getUserId/1"
+    
+    base_url = "https://172.20.10.2:8000/api"
     MQTT_BROKER_HOST = "localhost"
     MQTT_BROKER_PORT = 1883
 
@@ -34,12 +37,44 @@ class Cep2Controller:
         )
         self.__vibration_detected = False
         self.__current_medication_index = 0   
-        self.__medicine_data = WebClient(self.HTTP_GET_HOST).fetch_medication()
 
-        if self.__medicine_data:                                # Print data when starting program
+        # 1. Create a WebClient
+        self.__web_client = WebClient()
+
+        # 2. Fetch user ID dynamically
+        # email = "someuser@example.com"
+        # self.__user_id = self.__web_client.fetch_userid(email)  
+        self.__user_id = self.__web_client.fetch_userid()  
+        if not self.__user_id:
+            print("Failed to get user ID. Aborting startup.")
+            return
+
+        # Set user ID in the client (optional if stored inside)
+        self.__web_client.set_user_id(self.__user_id)
+
+        self.__medicine_data = self.__web_client.fetch_medication()
+        if self.__medicine_data:
             for r in self.__medicine_data:
                 print(r)
             print("\n")
+        # self.__devices_model = devices_model
+        # self.__z2m_client = Cep2Zigbee2mqttClient(
+        #     host=self.MQTT_BROKER_HOST,
+        #     port=self.MQTT_BROKER_PORT,
+        #     on_message_clbk=self.__zigbee2mqtt_event_received
+        # )
+        # self.__vibration_detected = False
+        # self.__current_medication_index = 0   
+
+        # self.__user_id = WebClient(self.HTTP_POST_HOST_USER).fetch_userid() 
+
+        # self.__medicine_data = WebClient(self.HTTP_GET_HOST).fetch_medication()
+        
+        # if self.__medicine_data:                                # Print data when starting program
+        #     for r in self.__medicine_data:
+        #         print(r)
+        #     print("\n")
+
 
 
     # Start listening for zigbee2mqtt events.
@@ -70,17 +105,22 @@ class Cep2Controller:
         device_id = tokens[1]
         device = self.__devices_model.find(device_id)
 
-        # # Real current time
-        # current_time = datetime.now()                           
-        # formatted_time = current_time.strftime("%H:%M:%S")
+        # Real current time
+        current_time = datetime.now()                           
+        formatted_time = current_time.strftime("%H:%M:%S")
 
-        # Set your own time for testing 
-        custom_time_str = "14:59:00"  # Replace with your desired time
-        custom_time = datetime.strptime(custom_time_str, "%H:%M:%S")
-        formatted_time = custom_time.strftime("%H:%M:%S") 
+        # # Set your own time for testing 
+        # custom_time_str = "14:59:00"  # Replace with your desired time
+        # custom_time = datetime.strptime(custom_time_str, "%H:%M:%S")
+        # formatted_time = custom_time.strftime("%H:%M:%S") 
 
-        # If device detected
         if device:
+            # print("User id is", self.__user_id, "\n")   
+            # WebClient(self.HTTP_POST_HOST_UDSTYR).device_status(device, message.event)              # Call Device status method 
+            self.__web_client.device_status(device, message.event)
+            print("DEBUG: Fetched userId =", self.__user_id) 
+
+            
             try:                                                                                    # Take messages based on device used
                 if device.type_ == "pir":
                     signal = message.event.get("occupancy")
@@ -90,7 +130,7 @@ class Cep2Controller:
                     signal = None
             except KeyError:
                 signal = None
- 
+
             if signal is not None and self.__current_medication_index < len(self.__medicine_data):  # Known device activity detected and current index is within medicine DB length
                 current_medication = self.__medicine_data[self.__current_medication_index]          # Set current medicine index
                 print("\n**** Current time:", formatted_time, " ****", 
@@ -155,13 +195,19 @@ class Cep2Controller:
                         }
                         encoded_data = base64.b64encode(json.dumps(payload).encode()).decode()
 
-                        # Send data to API
-                        client = WebClient(self.HTTP_POST_HOST)
                         try:
-                            client.send_event(encoded_data)
-                            print("Event successfully sent to the web client API.")
+                            url = f"{self.__web_client.base_url}/MedicationRegistrationLog/{self.__user_id}"
+                            self.__web_client.send_event(url, encoded_data)
+                            print("Medication was successfully logged")
                         except ConnectionError as ex:
                             print(f"Failed to send event to the web client API: {ex}")
+                        # # Send data to API
+                        # client = WebClient(self.HTTP_POST_HOST)
+                        # try:
+                        #     client.send_event(encoded_data)
+                        #     print("Medication was successfully logged")
+                        # except ConnectionError as ex:
+                        #     print(f"Failed to send event to the web client API: {ex}")
 
                         for b in self.__devices_model.actuators_list:
                             self.__z2m_client.change_color(b.id_, {"color": {"x": 0.15, "y": 0.75}})        # Green
