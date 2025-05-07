@@ -16,6 +16,7 @@ class Cep2ZigbeeDevice:
     # https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python
 
     id_: str
+    name_: str
     type_: str
 
 
@@ -79,3 +80,4 @@ class Cep2Model:
                               self.__devices.items()))
 
         return devices[0][1] if len(devices) >= 1 else None
+    
