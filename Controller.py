@@ -28,6 +28,7 @@ class Cep2Controller:
         self.__vibration_detected = False
         self.__current_medication_index = 0   
         self.__last_pir_room = None
+        self.__taken_status = 0
 
         self.__z2m_client = Cep2Zigbee2mqttClient(
             host=self.MQTT_BROKER_HOST,
@@ -148,13 +149,33 @@ class Cep2Controller:
                                   "\n**** MUST TAKE ACTION NOW ****")
                             for b in self.__devices_model.actuators_list:
                                 self.__z2m_client.change_color(b.id_, {"color": {"x": 0.72, "y": 0.25}})    # Red
+                            
+                            # Log medication has not been taken in DB
+                            self.__taken_status = 0
+                            payload = {
+                                "medicationLog": {
+                                    "name": current_medication['medikament_navn'],
+                                    "tagetTid": formatted_time,
+                                    "status": self.__taken_status,
+                                    "lokale": room 
+                                }
+                            }
+                            encoded_data = base64.b64encode(json.dumps(payload).encode()).decode()
+                            # Send to API
+                            try:
+                                url = f"{self.__web_client.base_url}/MedicationRegistrationLog/{self.__user_id}"
+                                self.__web_client.send_event(url, encoded_data)
+                                print("Medication not taken was logged")
+                            except ConnectionError as ex:
+                                print(f"Failed to send event to the web client API: {ex}")
                         
 
                 # Vibration detected with sensor
                 # No vibration has been detected
                 elif device.type_ == "vibration" and not self.__vibration_detected:
                     self.__vibration_detected = True                                                        # Set vibration detected to true
-                    room = self.__last_pir_room                                                             # Reinitialize room
+                    room = self.__last_pir_room 
+                    self.__taken_status = 1                                                            # Reinitialize room
                     
                     # Detect if taken
                     if formatted_time >= intake_time_str:
@@ -165,7 +186,7 @@ class Cep2Controller:
                             "medicationLog": {
                                 "name": current_medication['medikament_navn'],
                                 "tagetTid": formatted_time,
-                                "status": "taken",
+                                "status": self.__taken_status,
                                 "lokale": room 
                             }
                         }
@@ -183,7 +204,7 @@ class Cep2Controller:
                         for b in self.__devices_model.actuators_list:
                             self.__z2m_client.change_color(b.id_, {"color": {"x": 0.15, "y": 0.75}})        # Green
                         
-                        time.sleep(5)                                                                       # Decide how long to glow green after intake
+                        time.sleep(30)                                                                       # Decide how long to glow green after intake
                         self.__current_medication_index += 1                                                # Increment index
                         
                         for b in self.__devices_model.actuators_list:

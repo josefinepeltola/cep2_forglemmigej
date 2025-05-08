@@ -17,11 +17,8 @@ class WebClient:
         self.__last_room = None
 
 
-    """
-    CANNOT DYNAMICALLY FIND USER ID - IS HARDCODED
-    """
-    # Fetch User id from DB
-    def fetch_userid(self, hardcoded_id=1):
+    # Fetch User id from DB                                             # Harcoded User ID. See DB for running 
+    def fetch_userid(self, hardcoded_id=3):
         try:
             url = f"{self.base_url}/getUserId/{hardcoded_id}"
             response = requests.get(url, verify=False)

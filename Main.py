@@ -9,10 +9,10 @@ from WebClient import WebClient
 if __name__ == "__main__":
     # Create a data model and add a list of known Zigbee devices.
     devices_model = Cep2Model()
-    devices_model.add([Cep2ZigbeeDevice("0x54ef4410009495b7", "pir_Spisestue", "pir"),
-                       Cep2ZigbeeDevice("0x00158d000a983a3f", "vibration_Spisestue", "vibration"),
-                       Cep2ZigbeeDevice("0xbc33acfffe8b8d78", "led_Spisestue", "led"),
-                       Cep2ZigbeeDevice("0x680ae2fffe725853", "power plug_Spisestue", "power plug")
+    devices_model.add([Cep2ZigbeeDevice("0x54ef4410009495b7", "pir_Køkken", "pir"),
+                       Cep2ZigbeeDevice("0x00158d000a983a3f", "vibration_Køkken", "vibration"),
+                       Cep2ZigbeeDevice("0xbc33acfffe8b8d78", "led_Køkken", "led"),
+                       Cep2ZigbeeDevice("0x680ae2fffe725853", "power plug_Køkken", "power plug")
                        ])
 
     # Create a controller and give it the data model that was instantiated.
