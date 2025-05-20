@@ -1,7 +1,9 @@
+
 import requests
 from datetime import timedelta
 import base64
 import json
+import sys
 from urllib.parse import quote
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -12,20 +14,20 @@ The WebClient class manages the web API connection on the Pi.
 class WebClient:
     # Class initializer 
     def __init__(self):
-        self.base_url = "https://172.20.10.2:8000/api"
+        self.base_url  = "https://forglemmigej.duckdns.org/api"
         self.__user_id = None
         self.__last_room = None
 
 
     # Fetch User id from DB                                             # Harcoded User ID. See DB for running 
-    def fetch_userid(self, hardcoded_id=3):
+    def fetch_userid(self, hardcoded_id=2):
         try:
             url = f"{self.base_url}/getUserId/{hardcoded_id}"
             response = requests.get(url, verify=False)
 
             if response.status_code != 200:
                 print(f"API error: {response.status_code}")
-                return None
+                sys.exit(1)
 
             data = response.json()
             if data.get("status") == "success":
@@ -33,13 +35,12 @@ class WebClient:
                 return self.__user_id
             else:
                 print("Error from server:", data.get("message"))
-                return None
+                sys.exit(1)
         except Exception as e:
             print(f"Failed to fetch user ID: {e}")
-            return None        
-
-
-    # Fetch medication from DB for given user id
+            sys.exit(1)        
+        
+    
     def fetch_medication(self):
         if self.__user_id is None:
             print("User ID not set. Call fetch_userid() first.")
@@ -53,10 +54,19 @@ class WebClient:
                 print(f"API error: {response.status_code}")
                 return []
 
-            # Initialize as list, to handle multiple intake times
-            raw = response.json()                                                           
+            raw = response.json()
+
+            # Decode the Base64-encoded list
+            try:
+                encoded = raw.get("list")
+                decoded_json = base64.b64decode(encoded).decode("utf-8")
+                meds = json.loads(decoded_json)
+            except Exception as e:
+                print(f"Error decoding medication list: {e}")
+                return []
+
             flat_list = []
-            for med in raw.get('list', []):
+            for med in meds:
                 times = med['timesToTake']
                 if isinstance(times, str):
                     times = [times]
@@ -74,18 +84,26 @@ class WebClient:
             return []
         
 
-    # Post event to DB
-    def send_event(self, url: str, payload: dict):
+    def send_event(self, url: str, payload, is_base64=False):
         try:
+            if is_base64:
+                data = payload                                                      # Already base64-encoded string
+                headers = {"Content-Type": "application/json"}
+            else:
+                json_str = json.dumps(payload)
+                data = base64.b64encode(json_str.encode("utf-8")).decode("utf-8")
+                headers = {"Content-Type": "application/json"}
+
             response = requests.post(
                 url,
-                json=payload,
-                headers={"Content-Type": "application/json"},
+                data=data,   # Send raw string, not `json=`
+                headers=headers,
                 verify=False
             )
             response.raise_for_status()
         except Exception as e:
             print(f"Failed to send event: {e}")
+
 
 
     # Post device status to DB
@@ -144,9 +162,9 @@ class WebClient:
                 }
             ]
         }
+        encoded_payload = base64.b64encode(json.dumps(payload).encode()).decode()
         url = f"{self.base_url}/sendUdstyrListeInfo/{self.__user_id}"
-        self.send_event(url, payload)
+        self.send_event(url, encoded_payload, is_base64=True)
         # print("Device status successfully logged")          # Debug, check if data sent 
         
         return payload["udstyrData"][0]
-    

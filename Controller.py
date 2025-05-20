@@ -17,7 +17,7 @@ case, the class listens for zigbee2mqtt events, processes them (turn on another 
 and send an event to a remote HTTP server.
 """
 class Cep2Controller:
-    base_url = "https://172.20.10.2:8000/api"
+    base_url = "https://forglemmigej.duckdns.org/api"
     MQTT_BROKER_HOST = "localhost"
     MQTT_BROKER_PORT = 1883
 
@@ -83,7 +83,7 @@ class Cep2Controller:
         formatted_time = current_time.strftime("%H:%M:%S")
 
         # # Set your own time for testing 
-        # custom_time_str = "14:59:00"  # Replace with your desired time
+        # custom_time_str = "08:15:00"  # Replace with your desired time
         # custom_time = datetime.strptime(custom_time_str, "%H:%M:%S")
         # formatted_time = custom_time.strftime("%H:%M:%S") 
 
@@ -164,7 +164,7 @@ class Cep2Controller:
                             # Send to API
                             try:
                                 url = f"{self.__web_client.base_url}/MedicationRegistrationLog/{self.__user_id}"
-                                self.__web_client.send_event(url, encoded_data)
+                                self.__web_client.send_event(url, encoded_data, is_base64=True)
                                 print("Medication not taken was logged")
                             except ConnectionError as ex:
                                 print(f"Failed to send event to the web client API: {ex}")
@@ -195,7 +195,7 @@ class Cep2Controller:
                         # Send to API
                         try:
                             url = f"{self.__web_client.base_url}/MedicationRegistrationLog/{self.__user_id}"
-                            self.__web_client.send_event(url, encoded_data)
+                            self.__web_client.send_event(url, encoded_data, is_base64=True)
                             print("Medication intake was successfully logged")
                         except ConnectionError as ex:
                             print(f"Failed to send event to the web client API: {ex}")
